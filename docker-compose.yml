@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: newsql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: devopsdb
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - devops-net
+
+  flask:
+    build: .
+    container_name: flask-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root123
+      MYSQL_DATABASE: devopsdb
+    depends_on:
+      - mysql
+    networks:
+      - devops-net
+
+volumes:
+  mysql-data:
+
+networks:
+  devops-net:
+    driver: bridge

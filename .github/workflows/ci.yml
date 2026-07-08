@@ -1,0 +1,16 @@
+name: My first CI
+
+on: 
+ push:
+   branches:
+        - main
+jobs:
+  first-job:
+      runs-on: ubuntu-latest
+   
+      steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
+        
+        - name: Print The Message
+          run: echo "Hello from Github Runner"      
