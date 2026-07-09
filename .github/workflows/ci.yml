@@ -12,5 +12,18 @@ jobs:
         - name: Checkout Repository
           uses: actions/checkout@v4
         
-        - name: Print The Message
-          run: echo "Hello from Github Runner"      
+        - name: Set up Python
+          uses: actions/setup-python@v5
+          with:
+             python-version: "3.11"
+
+        - name: Install Dependencies
+          run: |
+             python -m pip install --upgrade pip
+             pip install -r requirements.txt
+       
+        - name: Verify Flask Application
+          run: python -m py_compile app.py
+       
+        - name: Build Docker Image
+          run: docker build -t flask-app:latest .
