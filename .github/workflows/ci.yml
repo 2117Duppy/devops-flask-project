@@ -35,9 +35,9 @@ jobs:
             password: ${{ secrets.DOCKER_ACCESSTOKEN }}
 
         - name: Tag Image
-           run: |
+          run: |
             docker tag flask-app:latest ${{ secrets.DOCKER_USERNAME }}/flask-app:latest
 
         - name: Push Image
-           run: |
-             docker push ${{ secrets.DOCKER_USERNAME }}/flask-app:latest
+          run: |
+            docker push ${{ secrets.DOCKER_USERNAME }}/flask-app:latest
