@@ -30,12 +30,6 @@ jobs:
         run: |
           echo "Build Successful" > report.txt
 
-      - name: Upload Build Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-report
-          path: report.txt
-
   build:
     needs: verify
     runs-on: ubuntu-latest
