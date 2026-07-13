@@ -5,7 +5,7 @@ on:
    branches:
         - main
 jobs:
-  first-job:
+  verify:
       runs-on: ubuntu-latest
    
       steps:
@@ -24,7 +24,15 @@ jobs:
        
         - name: Verify Flask Application
           run: python -m py_compile app.py
-       
+
+  build:
+     needs: verify
+     runs-on: ubuntu-latest
+
+     steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
+     
         - name: Build Docker Image
           run: docker build -t flask-app:latest .
  
