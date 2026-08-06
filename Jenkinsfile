@@ -7,7 +7,7 @@ pipeline {
             steps {
 
                 script {
-                    GIT_HASH = sh(
+                   def GIT_HASH = sh(
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
                     ).trim()
@@ -18,6 +18,8 @@ pipeline {
                 sh "pwd"
 
                 sh "docker build -t flask-app:${BUILD_NUMBER}-${GIT_HASH} ."
+
+                sh "docker run --name flask-app -d -p 5000:5000 flask-app:${BUILD_NUMBER}-${GIT_HASH}"
 
             }
         }
