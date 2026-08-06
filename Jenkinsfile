@@ -1,13 +1,26 @@
 pipeline {
-   agent any
+    agent any
 
-   stages {
-       stage('Build Docker Image'){
+    stages {
+
+        stage('Build Docker Image') {
             steps {
-                  sh 'pwd'
-                  sh 'GIT_HASH=$(git rev-parse --short HEAD)'
-                  sh 'docker build -t flask-app:$GIT_HASH .'
+
+                script {
+                    GIT_HASH = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                }
+
+                echo "Git Hash: ${GIT_HASH}"
+
+                sh "pwd"
+
+                sh "docker build -t flask-app:${BUILD_NUMBER}-${GIT_HASH} ."
+
             }
-       }
-   }
+        }
+
+    }
 }
