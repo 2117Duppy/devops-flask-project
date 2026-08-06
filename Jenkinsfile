@@ -7,10 +7,10 @@ pipeline {
             steps {
 
                 script {
-                   def GIT_HASH = sh(
+                    GIT_HASH = sh(
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
-                    ).trim()
+                   ).trim()
                 }
 
                 echo "Git Hash: ${GIT_HASH}"
