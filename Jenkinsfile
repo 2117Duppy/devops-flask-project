@@ -2,9 +2,9 @@ pipeline {
    agent any
 
    stages {
-       stage('Helloo!'){
+       stage('Build Docker Image'){
             steps {
-                  echo('Hey Bhavyaaaaa <3, Hello from Jenkins')
+                  sh 'docker build -t flask-app:latest .'
             }
        }
    }
