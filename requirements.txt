@@ -2,3 +2,4 @@ Flask==2.0.1
 PyMySQL
 Werkzeug==2.2.2
 cryptography
+gunicorn
