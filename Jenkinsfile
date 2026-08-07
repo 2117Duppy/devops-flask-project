@@ -2,6 +2,17 @@ pipeline {
     agent any
 
     stages {
+        
+        stage('Calculate the version of the build'){
+            steps{
+              script{
+                 def GIT_HASH = sh( script: 'git rev-parse --short HEAD', returnStdout: true ).trim()
+                 echo "Git Hash: ${GIT_HASH}"
+                 sh "pwd"
+          
+              }
+           }
+        }
 
         stage('Deploy Application') {
             steps {
@@ -21,7 +32,7 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                sh "curl --fail http://host.docker.internal"
+                sh "curl --fail --silent http://host.docker.internal"
             }
         }
     }
