@@ -11,18 +11,20 @@ pipeline {
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
                    ).trim()
-                }
 
-                echo "Git Hash: ${GIT_HASH}"
+                   echo "Git Hash: ${GIT_HASH}"
 
-                sh "pwd"
+                   sh "pwd"
 
-                sh "docker build -t flask-app:${BUILD_NUMBER}-${GIT_HASH} ."
+                   sh """
+                        docker build -t flask-app:${BUILD_NUMBER}-${GIT_HASH} .
 
-                sh "docker run --name flask-app -d -p 5000:5000 flask-app:${BUILD_NUMBER}-${GIT_HASH}"
+                        docker rm -f flask-app || true
 
+                        docker run --name flask-app -d -p 5000:5000 flask-app:${BUILD_NUMBER}-${GIT_HASH}
+                   """
+               }
             }
         }
-
     }
 }
