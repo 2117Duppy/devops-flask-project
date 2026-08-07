@@ -3,27 +3,25 @@ pipeline {
 
     stages {
 
-        stage('Build Docker Image') {
+        stage('Deploy Application') {
             steps {
+                sh """
+                    docker compose down
 
-                script {
-                    GIT_HASH = sh(
-                        script: 'git rev-parse --short HEAD',
-                        returnStdout: true
-                   ).trim()
+                    docker compose up -d --build
+                """
+            }
+        }
 
-                   echo "Git Hash: ${GIT_HASH}"
+        stage('Wait for Services') {
+            steps {
+                sh "sleep 10"
+            }
+        }
 
-                   sh "pwd"
-
-                   sh """
-                        docker build -t flask-app:${BUILD_NUMBER}-${GIT_HASH} .
-
-                        docker rm -f flask-app || true
-
-                        docker run --name flask-app -d -p 5000:5000 flask-app:${BUILD_NUMBER}-${GIT_HASH}
-                   """
-               }
+        stage('Health Check') {
+            steps {
+                sh "curl --fail http://host.docker.internal"
             }
         }
     }
