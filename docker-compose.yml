@@ -3,7 +3,6 @@ version: "3.8"
 services:
   mysql:
     image: mysql:8.0
-    container_name: newsql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -22,7 +21,6 @@ services:
 
   flask:
     build: .
-    container_name: flask-app
     restart: unless-stopped
     environment:
       MYSQL_HOST: mysql
@@ -37,7 +35,6 @@ services:
 
   nginx:
    build: ./nginx
-   container_name: nginx
    restart: unless-stopped
    ports:
     - "80:80"
