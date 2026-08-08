@@ -1,50 +1,70 @@
-version: "3.8"
-
 services:
+
   mysql:
-    image: mysql:8.0
+    build:
+      context: .
+      dockerfile: mysql/Dockerfile
+
+    container_name: newsql
     restart: unless-stopped
+
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
+
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
     networks:
       - devops-net
+
     healthcheck:
-        test: ["CMD-SHELL", 'mysqladmin ping -h localhost -u root -p"$MYSQL_ROOT_PASSWORD"']
-        interval: 2s
-        timeout: 2s
-        retries: 5
-        start_period: 20s
+      test: ["CMD-SHELL", 'mysqladmin ping -h localhost -u root -p"$MYSQL_ROOT_PASSWORD"']
+      interval: 2s
+      timeout: 2s
+      retries: 5
+      start_period: 20s
+
 
   flask:
     build: .
+
+    container_name: flask-app
     restart: unless-stopped
+
     environment:
       MYSQL_HOST: mysql
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
+
     depends_on:
       mysql:
         condition: service_healthy
+
     networks:
       - devops-net
 
+
   nginx:
-   build: ./nginx
-   restart: unless-stopped
-   ports:
-    - "80:80"
-   depends_on:
-    - flask
-   networks:
-    - devops-net
+    build: ./nginx
+
+    container_name: nginx
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+
+    depends_on:
+      - flask
+
+    networks:
+      - devops-net
+
 
 volumes:
   mysql-data:
+
 
 networks:
   devops-net:
