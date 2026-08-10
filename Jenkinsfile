@@ -41,6 +41,25 @@ pipeline {
             }
         }
 
+        stage('Archive Artifact') {
+            steps {
+                 archiveArtifacts artifacts: 'build-info.txt'
+            }
+        }
+       
+        stage('Create Build Artifact') {
+            steps {
+                script {
+                    writeFile(
+                         file: 'build-info.txt',
+                         text: """Build Number: ${BUILD_NUMBER}
+                         Git Commit: ${GIT_COMMIT}
+                         """
+                    )
+                }
+            }    
+        }
+
         stage('Wait for Services') {
             steps {
                 sh "sleep 10"
