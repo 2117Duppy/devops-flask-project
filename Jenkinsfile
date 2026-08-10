@@ -40,12 +40,6 @@ pipeline {
                 }
             }
         }
-
-        stage('Archive Artifact') {
-            steps {
-                 archiveArtifacts artifacts: 'build-info.txt'
-            }
-        }
        
         stage('Create Build Artifact') {
             steps {
@@ -58,6 +52,12 @@ pipeline {
                     )
                 }
             }    
+        }
+
+        stage('Archive Artifact') {
+             steps {
+                 archiveArtifacts artifacts: 'build-info.txt'
+             }
         }
 
         stage('Wait for Services') {
