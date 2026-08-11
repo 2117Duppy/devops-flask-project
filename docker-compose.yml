@@ -5,7 +5,6 @@ services:
       context: .
       dockerfile: mysql/Dockerfile
 
-    container_name: newsql
     restart: unless-stopped
 
     environment:
@@ -28,7 +27,6 @@ services:
 
   flask-blue:
     build: .
-    container_name: flask-blue
     restart: unless-stopped
 
     environment:
@@ -47,7 +45,6 @@ services:
 
   flask-green:
     build: .
-    container_name: flask-green
     restart: unless-stopped
 
     environment:
@@ -66,7 +63,6 @@ services:
 
   nginx:
     build: ./nginx
-    container_name: nginx
     restart: unless-stopped
 
     ports:
