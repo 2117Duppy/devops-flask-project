@@ -31,16 +31,40 @@ pipeline {
                     string(
                         credentialsId: 'mysql-user',
                         variable: 'MYSQL_USER'
-                    )
+                     )
                 ]) {
-                    sh """
-                        docker-compose down
-                        docker-compose up -d --build
-                    """
+                    script { 
+
+                        def ACTIVE_ENV = readFile('active-environment.txt').trim()
+                        if (ACTIVE_ENV == 'BLUE') {
+                           
+                            echo "BLUE is currently active."
+                            echo "Deploying GREEN..." 
+
+                            sh """
+                              docker-compose build flask-green
+                              docker-compose up -d flask-green
+                            """
+                       } else if (ACTIVE_ENV == 'GREEN') {
+
+                           echo "GREEN is currently active."
+                           echo "Deploying BLUE..."
+                          
+                           sh """
+                              docker-compose build flask-blue
+                              docker-compose up -d flask-blue
+                           """ 
+                       } else {
+
+                           error "Invalid active environment: ${ACTIVE_ENV}"
+ 
+                       }
+                    }
                 }
             }
         }
-       
+
+                               
         stage('Create Build Artifact') {
             steps {
                 script {
