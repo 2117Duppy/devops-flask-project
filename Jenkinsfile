@@ -64,7 +64,29 @@ pipeline {
             }
         }
 
-                               
+        stage('Health check New Environment'){
+            steps {
+                script {
+                    def ACTIVE_ENV = readFile('active-environment.txt').trim()
+                    if ( ACTIVE_ENV == 'BLUE' ){
+                         echo "Checking GREEN..."
+                         sh """
+                            docker-compose exec -T flask-green \
+                            curl --fail --silent http://localhost:5000
+                         """
+                    } else if (ACTIVE_ENV == 'GREEN') {
+                        echo "Checking BLUE..."
+                        sh """
+                           docker-compose exec -T flask-blue \
+                           curl --fail --silent https://localhost:5000
+                        """
+                    } else {
+                        error "Invalid active environment: ${ACTIVE_ENV}"
+                    }
+                }
+            }
+        }
+                     
         stage('Create Build Artifact') {
             steps {
                 script {
