@@ -71,12 +71,12 @@ pipeline {
                     if ( ACTIVE_ENV == 'BLUE' ){
                          echo "Checking GREEN..."
                          sh """
-                            docker-compose exec -T flask-green python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')
+                            docker-compose exec -T flask-green python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')"
                          """
                     } else if (ACTIVE_ENV == 'GREEN') {
                         echo "Checking BLUE..."
                         sh """
-                           docker-compose exec -T flask-blue python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')
+                           docker-compose exec -T flask-blue python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')"
                         """
                     } else {
                         error "Invalid active environment: ${ACTIVE_ENV}"
