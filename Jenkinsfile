@@ -48,7 +48,7 @@ pipeline {
                          * Jenkins owns this Compose project.
                          */
                         sh '''
-                            docker-compose -p ${COMPOSE_PROJECT} up -d mysql nginx
+                            docker-compose -p ${COMPOSE_PROJECT} up -d --build mysql nginx
                         '''
 
                         if (ACTIVE_ENV == 'BLUE') {
