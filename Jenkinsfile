@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    environment {
+        COMPOSE_PROJECT = 'devops-flask-pipeline'
+    }
+
     stages {
 
         stage('Calculate the version of the build') {
@@ -12,7 +16,7 @@ pipeline {
                     ).trim()
 
                     echo "Git Hash: ${GIT_HASH}"
-                    sh "pwd"
+                    sh 'pwd'
                 }
             }
         }
@@ -37,14 +41,24 @@ pipeline {
 
                         def ACTIVE_ENV = readFile('active-environment.txt').trim()
 
+                        echo "Currently active environment: ${ACTIVE_ENV}"
+
+                        /*
+                         * Make sure shared infrastructure exists.
+                         * Jenkins owns this Compose project.
+                         */
+                        sh '''
+                            docker-compose -p ${COMPOSE_PROJECT} up -d mysql nginx
+                        '''
+
                         if (ACTIVE_ENV == 'BLUE') {
 
                             echo "BLUE is currently active."
                             echo "Deploying GREEN..."
 
                             sh '''
-                                docker-compose build flask-green
-                                docker-compose up -d flask-green
+                                docker-compose -p ${COMPOSE_PROJECT} build flask-green
+                                docker-compose -p ${COMPOSE_PROJECT} up -d flask-green
                             '''
 
                         } else if (ACTIVE_ENV == 'GREEN') {
@@ -53,8 +67,8 @@ pipeline {
                             echo "Deploying BLUE..."
 
                             sh '''
-                                docker-compose build flask-blue
-                                docker-compose up -d flask-blue
+                                docker-compose -p ${COMPOSE_PROJECT} build flask-blue
+                                docker-compose -p ${COMPOSE_PROJECT} up -d flask-blue
                             '''
 
                         } else {
@@ -78,7 +92,7 @@ pipeline {
                         echo "Checking GREEN..."
 
                         sh '''
-                            docker-compose exec -T flask-green \
+                            docker-compose -p ${COMPOSE_PROJECT} exec -T flask-green \
                             python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')"
                         '''
 
@@ -87,7 +101,7 @@ pipeline {
                         echo "Checking BLUE..."
 
                         sh '''
-                            docker-compose exec -T flask-blue \
+                            docker-compose -p ${COMPOSE_PROJECT} exec -T flask-blue \
                             python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')"
                         '''
 
@@ -113,9 +127,9 @@ pipeline {
                         sh '''
                             sed -i 's/flask-blue:5000/flask-green:5000/' nginx/nginx.conf
 
-                            docker-compose exec -T nginx nginx -t
+                            docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
 
-                            docker-compose exec -T nginx nginx -s reload
+                            docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
                         '''
 
                     } else if (ACTIVE_ENV == 'GREEN') {
@@ -125,9 +139,9 @@ pipeline {
                         sh '''
                             sed -i 's/flask-green:5000/flask-blue:5000/' nginx/nginx.conf
 
-                            docker-compose exec -T nginx nginx -t
+                            docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
 
-                            docker-compose exec -T nginx nginx -s reload
+                            docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
                         '''
 
                     } else {
@@ -147,6 +161,39 @@ pipeline {
             }
         }
 
+        stage('Update Active Environment') {
+            steps {
+                script {
+
+                    def ACTIVE_ENV = readFile('active-environment.txt').trim()
+
+                    if (ACTIVE_ENV == 'BLUE') {
+
+                        writeFile(
+                            file: 'active-environment.txt',
+                            text: 'GREEN\n'
+                        )
+
+                        echo "GREEN is now the active environment."
+
+                    } else if (ACTIVE_ENV == 'GREEN') {
+
+                        writeFile(
+                            file: 'active-environment.txt',
+                            text: 'BLUE\n'
+                        )
+
+                        echo "BLUE is now the active environment."
+
+                    } else {
+
+                        error "Invalid active environment: ${ACTIVE_ENV}"
+
+                    }
+                }
+            }
+        }
+
         stage('Create Build Artifact') {
             steps {
                 script {
@@ -154,6 +201,7 @@ pipeline {
                         file: 'build-info.txt',
                         text: """Build Number: ${BUILD_NUMBER}
 Git Commit: ${GIT_COMMIT}
+Active Environment: ${readFile('active-environment.txt').trim()}
 """
                     )
                 }
@@ -172,9 +220,11 @@ Git Commit: ${GIT_COMMIT}
             }
         }
 
-        stage('Health Check') {
+        stage('Final Health Check') {
             steps {
-                sh 'curl --fail --silent http://host.docker.internal'
+                sh '''
+                    curl --fail --silent http://host.docker.internal
+                '''
             }
         }
     }
