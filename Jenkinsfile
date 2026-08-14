@@ -161,10 +161,29 @@ pipeline {
 
         stage('Verify Traffic') {
             steps {
-                sh '''
-                    curl --fail --silent http://host.docker.internal
-                '''
-            }
+               script {
+                   def ACTIVE_ENV = readFile('active-environment.txt').trim()
+                   if (ACTIVE_ENV == 'BLUE') {
+                      echo "Verifying traffic is now going to GREEN..."
+                      sh '''
+                         docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T \
+                         | grep 'proxy_pass http://flask-green:5000;'
+             
+                         curl --fail --silent http://host.docker.internal
+                      '''
+                  } else if (ACTIVE_ENV == 'GREEN') {
+                     echo "Verifying traffic is now going to BLUE..."
+                     sh '''
+                       docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T \
+                       | grep 'proxy_pass http://flask-blue:5000;'
+ 
+                       curl --fail --silent http://host.docker.internal
+                    '''
+                  } else {
+                    error "Invalid active environment: ${ACTIVE_ENV}"
+
+                  }
+            } 
         }
 
         stage('Update Active Environment') {
