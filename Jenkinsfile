@@ -127,6 +127,9 @@ pipeline {
                         sh '''
                             sed -i 's/flask-blue:5000/flask-green:5000/' nginx/nginx.conf
 
+                            docker cp nginx/nginx.conf \
+                            devops-flask-pipeline-nginx-1:/etc/nginx/nginx.conf
+ 
                             docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
 
                             docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
@@ -138,7 +141,10 @@ pipeline {
 
                         sh '''
                             sed -i 's/flask-green:5000/flask-blue:5000/' nginx/nginx.conf
-
+                           
+                            docker cp nginx/nginx.conf \
+                            devops-flask-pipeline-nginx-1:/etc/nginx/nginx.conf
+                           
                             docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
 
                             docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
