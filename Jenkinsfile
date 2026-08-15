@@ -6,7 +6,6 @@ pipeline {
     }
 
     stages {
-
         stage('Calculate the version of the build') {
             steps {
                 script {
@@ -38,7 +37,6 @@ pipeline {
                     )
                 ]) {
                     script {
-
                         def ACTIVE_ENV = readFile('active-environment.txt').trim()
 
                         echo "Currently active environment: ${ACTIVE_ENV}"
@@ -52,29 +50,23 @@ pipeline {
                         '''
 
                         if (ACTIVE_ENV == 'BLUE') {
-
-                            echo "BLUE is currently active."
-                            echo "Deploying GREEN..."
+                            echo 'BLUE is currently active.'
+                            echo 'Deploying GREEN...'
 
                             sh '''
                                 docker-compose -p ${COMPOSE_PROJECT} build flask-green
                                 docker-compose -p ${COMPOSE_PROJECT} up -d flask-green
                             '''
-
                         } else if (ACTIVE_ENV == 'GREEN') {
-
-                            echo "GREEN is currently active."
-                            echo "Deploying BLUE..."
+                            echo 'GREEN is currently active.'
+                            echo 'Deploying BLUE...'
 
                             sh '''
                                 docker-compose -p ${COMPOSE_PROJECT} build flask-blue
                                 docker-compose -p ${COMPOSE_PROJECT} up -d flask-blue
                             '''
-
                         } else {
-
                             error "Invalid active environment: ${ACTIVE_ENV}"
-
                         }
                     }
                 }
@@ -84,137 +76,143 @@ pipeline {
         stage('Health Check New Environment') {
             steps {
                 script {
-
                     def ACTIVE_ENV = readFile('active-environment.txt').trim()
 
                     if (ACTIVE_ENV == 'BLUE') {
-
-                        echo "Checking GREEN..."
+                        echo 'Checking GREEN...'
 
                         sh '''
                             docker-compose -p ${COMPOSE_PROJECT} exec -T flask-green \
                             python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')"
                         '''
-
                     } else if (ACTIVE_ENV == 'GREEN') {
-
-                        echo "Checking BLUE..."
+                        echo 'Checking BLUE...'
 
                         sh '''
                             docker-compose -p ${COMPOSE_PROJECT} exec -T flask-blue \
                             python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')"
                         '''
-
                     } else {
-
                         error "Invalid active environment: ${ACTIVE_ENV}"
-
                     }
                 }
             }
         }
 
-        stage('Switch Traffic') {
+        stage('Switch Traffic and Verify') {
             steps {
                 script {
-
                     def ACTIVE_ENV = readFile('active-environment.txt').trim()
 
-                    if (ACTIVE_ENV == 'BLUE') {
+                    try {
+                        if (ACTIVE_ENV == 'BLUE') {
+                            echo 'Switching traffic: BLUE → GREEN'
 
-                        echo "Switching traffic: BLUE → GREEN"
+                            sh '''
+                                sed -i 's/flask-blue:5000/flask-green:5000/' nginx/nginx.conf
 
-                        sh '''
-                            sed -i 's/flask-blue:5000/flask-green:5000/' nginx/nginx.conf
+                                docker cp nginx/nginx.conf \
+                                devops-flask-pipeline-nginx-1:/etc/nginx/nginx.conf
 
-                            docker cp nginx/nginx.conf \
-                            devops-flask-pipeline-nginx-1:/etc/nginx/nginx.conf
- 
-                            docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
 
-                            docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
-                        '''
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
+                            '''
 
-                    } else if (ACTIVE_ENV == 'GREEN') {
+                            echo 'Verifying traffic is now going to GREEN...'
 
-                        echo "Switching traffic: GREEN → BLUE"
+                            sh '''
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T \
+                                | grep 'proxy_pass http://flask-green:5000;'
 
-                        sh '''
-                            sed -i 's/flask-green:5000/flask-blue:5000/' nginx/nginx.conf
-                           
-                            docker cp nginx/nginx.conf \
-                            devops-flask-pipeline-nginx-1:/etc/nginx/nginx.conf
-                           
-                            docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
+                                curl --fail --silent http://host.docker.internal
+                            '''
+                        } else if (ACTIVE_ENV == 'GREEN') {
+                            echo 'Switching traffic: GREEN → BLUE'
 
-                            docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
-                        '''
+                            sh '''
+                                sed -i 's/flask-green:5000/flask-blue:5000/' nginx/nginx.conf
 
-                    } else {
+                                docker cp nginx/nginx.conf \
+                                devops-flask-pipeline-nginx-1:/etc/nginx/nginx.conf
 
-                        error "Invalid active environment: ${ACTIVE_ENV}"
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
 
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
+                            '''
+
+                            echo 'Verifying traffic is now going to BLUE...'
+
+                            sh '''
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T \
+                                | grep 'proxy_pass http://flask-blue:5000;'
+
+                                curl --fail --silent http://host.docker.internal
+                            '''
+                        } else {
+                            error "Invalid active environment: ${ACTIVE_ENV}"
+                        }
+                    } catch (err) {
+                        echo 'Traffic verification failed!'
+                        echo 'Starting rollback...'
+
+                        if (ACTIVE_ENV == 'BLUE') {
+                            echo 'Rolling back: GREEN → BLUE'
+
+                            sh '''
+                                sed -i 's/flask-green:5000/flask-blue:5000/' nginx/nginx.conf
+
+                                docker cp nginx/nginx.conf \
+                                devops-flask-pipeline-nginx-1:/etc/nginx/nginx.conf
+
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
+
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
+                            '''
+                        } else if (ACTIVE_ENV == 'GREEN') {
+                            echo 'Rolling back: BLUE → GREEN'
+
+                            sh '''
+                                sed -i 's/flask-blue:5000/flask-green:5000/' nginx/nginx.conf
+
+                                docker cp nginx/nginx.conf \
+                                devops-flask-pipeline-nginx-1:/etc/nginx/nginx.conf
+
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -t
+
+                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload
+                            '''
+                        }
+
+                        echo 'Rollback completed.'
+
+                        throw err
                     }
                 }
             }
-        }
-
-        stage('Verify Traffic') {
-            steps {
-               script {
-                   def ACTIVE_ENV = readFile('active-environment.txt').trim()
-                   if (ACTIVE_ENV == 'BLUE') {
-                      echo "Verifying traffic is now going to GREEN..."
-                      sh '''
-                         docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T \
-                         | grep 'proxy_pass http://flask-green:5000;'
-             
-                         curl --fail --silent http://host.docker.internal
-                      '''
-                  } else if (ACTIVE_ENV == 'GREEN') {
-                     echo "Verifying traffic is now going to BLUE..."
-                     sh '''
-                       docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T \
-                       | grep 'proxy_pass http://flask-blue:5000;'
- 
-                       curl --fail --silent http://host.docker.internal
-                    '''
-                  } else {
-                    error "Invalid active environment: ${ACTIVE_ENV}"
-
-                  }
-               }
-            } 
         }
 
         stage('Update Active Environment') {
             steps {
                 script {
-
                     def ACTIVE_ENV = readFile('active-environment.txt').trim()
 
                     if (ACTIVE_ENV == 'BLUE') {
-
                         writeFile(
                             file: 'active-environment.txt',
                             text: 'GREEN\n'
                         )
 
-                        echo "GREEN is now the active environment."
-
+                        echo 'GREEN is now the active environment.'
                     } else if (ACTIVE_ENV == 'GREEN') {
-
                         writeFile(
                             file: 'active-environment.txt',
                             text: 'BLUE\n'
                         )
 
-                        echo "BLUE is now the active environment."
-
+                        echo 'BLUE is now the active environment.'
                     } else {
-
                         error "Invalid active environment: ${ACTIVE_ENV}"
-
                     }
                 }
             }
@@ -226,9 +224,9 @@ pipeline {
                     writeFile(
                         file: 'build-info.txt',
                         text: """Build Number: ${BUILD_NUMBER}
-Git Commit: ${GIT_COMMIT}
-Active Environment: ${readFile('active-environment.txt').trim()}
-"""
+                            Git Commit: ${GIT_COMMIT}
+                            Active Environment: ${readFile('active-environment.txt').trim()}
+                        """
                     )
                 }
             }
@@ -256,7 +254,6 @@ Active Environment: ${readFile('active-environment.txt').trim()}
     }
 
     post {
-
         success {
             echo 'Pipeline completed successfully!'
         }
