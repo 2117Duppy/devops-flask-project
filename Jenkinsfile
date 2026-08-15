@@ -218,6 +218,32 @@ pipeline {
             }
         }
 
+        stage('Cleanup Old Environment') {
+            steps {
+                script {
+
+                    def ACTIVE_ENV = readFile('active-environment.txt').trim()
+
+                    if (ACTIVE_ENV == 'GREEN') {
+                        echo "GREEN is active. Stopping old BLUE environment..."
+                        sh '''
+                            docker-compose -p ${COMPOSE_PROJECT} stop flask-blue
+                        '''
+                    } else if (ACTIVE_ENV == 'BLUE') {
+
+                        echo "BLUE is active. Stopping old GREEN environment..."
+                        sh '''
+                            docker-compose -p ${COMPOSE_PROJECT} stop flask-green
+                        '''
+
+                    } else {
+
+                        error "Invalid active environment: ${ACTIVE_ENV}"
+                    }
+                }
+            }
+        }
+
         stage('Create Build Artifact') {
             steps {
                 script {
