@@ -68,10 +68,6 @@ services:
     ports:
       - "80:80"
 
-    depends_on:
-      - flask-blue
-      - flask-green
-
     networks:
       - devops-net
 
