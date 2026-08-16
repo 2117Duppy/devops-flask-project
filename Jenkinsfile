@@ -38,15 +38,24 @@ pipeline {
                     )
                 ]) {
                     script {
-
                         // Nginx is the source of truth.
                         // Check which Flask environment is currently receiving traffic.
                         def ACTIVE_ENV = sh(
                             script: '''
-                                docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T 2>/dev/null |
-                                grep -q "proxy_pass http://flask-green:5000;" &&
-                                echo "GREEN" ||
-                                echo "BLUE"
+                                set -e
+
+                                ACTIVE=$(docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T 2>/dev/null |
+                                    grep 'proxy_pass http://flask-' |
+                                    head -n 1)
+
+                                if echo "$ACTIVE" | grep -q "flask-green:5000"; then
+                                    echo "GREEN"
+                                elif echo "$ACTIVE" | grep -q "flask-blue:5000"; then
+                                    echo "BLUE"
+                                else
+                                    echo "ERROR"
+                                    exit 1
+                                fi
                             ''',
                             returnStdout: true
                         ).trim()
@@ -54,8 +63,12 @@ pipeline {
                         echo "Currently active environment: ${ACTIVE_ENV}"
 
                         // Make sure MySQL and Nginx are running.
+                        // sh '''
+                        //     docker-compose -p ${COMPOSE_PROJECT} up -d --build mysql nginx
+                        // '''
+
                         sh '''
-                            docker-compose -p ${COMPOSE_PROJECT} up -d --build mysql nginx
+                            docker-compose -p ${COMPOSE_PROJECT} up -d mysql
                         '''
 
                         if (ACTIVE_ENV == 'BLUE') {
@@ -79,9 +92,7 @@ pipeline {
                             '''
 
                         } else {
-
                             error "Invalid active environment: ${ACTIVE_ENV}"
-
                         }
                     }
                 }
@@ -321,15 +332,12 @@ pipeline {
     }
 
     post {
-
         success {
             echo 'Pipeline completed successfully!'
         }
-
         failure {
             echo 'Pipeline failed!'
         }
-
         always {
             echo 'Pipeline finished.'
         }
