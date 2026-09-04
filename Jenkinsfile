@@ -18,6 +18,13 @@ pipeline {
                 ]) {
                     sh '''
                         aws sts get-caller-identity
+
+                        echo "Checking ALB target groups..."
+
+                        aws elbv2 describe-target-groups \
+                        --region ap-south-1 \
+                        --query 'TargetGroups[].{Name:TargetGroupName,Arn:TargetGroupArn}' \
+                        --output table
                     '''
                 }
             }
