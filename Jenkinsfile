@@ -70,6 +70,136 @@ pipeline {
             }
         }
 
+        stage('Switch ALB Traffic') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'aws-jenkins-deployer',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )
+                ]) {
+                    script {
+
+                        def ALB_ARN = sh(
+                            script: '''
+                                set -e
+
+                                aws elbv2 describe-load-balancers \
+                                    --region ap-south-1 \
+                                    --names devops-flask-alb \
+                                    --query 'LoadBalancers[0].LoadBalancerArn' \
+                                    --output text
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        def LISTENER_ARN = sh(
+                            script: """
+                                set -e
+
+                                aws elbv2 describe-listeners \
+                                    --region ap-south-1 \
+                                    --load-balancer-arn '${ALB_ARN}' \
+                                    --query 'Listeners[0].ListenerArn' \
+                                    --output text
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        def CURRENT_TG = sh(
+                            script: """
+                                set -e
+
+                                aws elbv2 describe-listeners \
+                                    --region ap-south-1 \
+                                    --listener-arns '${LISTENER_ARN}' \
+                                    --query 'Listeners[0].DefaultActions[0].TargetGroupArn' \
+                                    --output text
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        echo "Current Target Group: ${CURRENT_TG}"
+
+                        def TARGET_TG = ''
+
+                        if (CURRENT_TG.contains('devops-flask-green-tg')) {
+
+                            echo "🟢 GREEN is active"
+                            echo "Switching traffic GREEN → BLUE"
+
+                            TARGET_TG = sh(
+                                script: '''
+                                    aws elbv2 describe-target-groups \
+                                        --region ap-south-1 \
+                                        --names devops-flask-tg \
+                                        --query 'TargetGroups[0].TargetGroupArn' \
+                                        --output text
+                                ''',
+                                returnStdout: true
+                            ).trim()
+
+                        } else if (CURRENT_TG.contains('devops-flask-tg')) {
+
+                            echo "🔵 BLUE is active"
+                            echo "Switching traffic BLUE → GREEN"
+
+                            TARGET_TG = sh(
+                                script: '''
+                                    aws elbv2 describe-target-groups \
+                                        --region ap-south-1 \
+                                        --names devops-flask-green-tg \
+                                        --query 'TargetGroups[0].TargetGroupArn' \
+                                        --output text
+                                ''',
+                                returnStdout: true
+                            ).trim()
+
+                        } else {
+
+                            error "Unknown current target group: ${CURRENT_TG}"
+
+                        }
+
+                        echo "New Target Group: ${TARGET_TG}"
+
+                        sh """
+                            set -e
+
+                            aws elbv2 modify-listener \
+                                --region ap-south-1 \
+                                --listener-arn '${LISTENER_ARN}' \
+                                --default-actions Type=forward,TargetGroupArn='${TARGET_TG}'
+                        """
+
+                        echo "ALB traffic switch completed."
+
+                        def VERIFIED_TG = sh(
+                            script: """
+                                set -e
+
+                                aws elbv2 describe-listeners \
+                                    --region ap-south-1 \
+                                    --listener-arns '${LISTENER_ARN}' \
+                                    --query 'Listeners[0].DefaultActions[0].TargetGroupArn' \
+                                    --output text
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        echo "Verified Target Group: ${VERIFIED_TG}"
+
+                        if (VERIFIED_TG != TARGET_TG) {
+                            error "ALB traffic switch verification failed!"
+                        }
+
+                        echo "✅ ALB traffic switch verified successfully."
+                    }
+                }
+            }
+        }
+
         stage('Calculate the version of the build') {
             steps {
                 script {
