@@ -30,6 +30,46 @@ pipeline {
             }
         }
 
+        stage('Detect ALB Active Environment') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'aws-jenkins-deployer',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )
+                ]) {
+                    script {
+
+                        def ACTIVE_TG = sh(
+                            script: '''
+                                aws elbv2 describe-listeners \
+                                    --region ap-south-1 \
+                                    --load-balancer-arn $(aws elbv2 describe-load-balancers \
+                                        --region ap-south-1 \
+                                        --names devops-flask-alb \
+                                        --query 'LoadBalancers[0].LoadBalancerArn' \
+                                        --output text) \
+                                    --query 'Listeners[0].DefaultActions[0].TargetGroupArn' \
+                                    --output text
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        echo "Active ALB Target Group ARN: ${ACTIVE_TG}"
+
+                        if (ACTIVE_TG.contains('devops-flask-green-tg')) {
+                            echo "🟢 ALB is currently pointing to GREEN"
+                        } else if (ACTIVE_TG.contains('devops-flask-tg')) {
+                            echo "🔵 ALB is currently pointing to BLUE"
+                        } else {
+                            error "Unknown ALB target group: ${ACTIVE_TG}"
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Calculate the version of the build') {
             steps {
                 script {
