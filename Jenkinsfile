@@ -364,40 +364,63 @@ pipeline {
 
         stage('Health Check New Environment') {
             steps {
-                script {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'ec2-deploy-key',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )
+                ]) {
+                    script {
 
-                    def ACTIVE_ENV = sh(
-                        script: '''
-                            docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T 2>/dev/null |
-                            grep -q "proxy_pass http://flask-green:5000;" &&
-                            echo "GREEN" ||
-                            echo "BLUE"
-                        ''',
-                        returnStdout: true
-                    ).trim()
+                // Ask EC2 which environment is currently active.
+                        def ACTIVE_ENV = sh(
+                            script: '''
+                                ssh -o StrictHostKeyChecking=no \
+                                    -i "$SSH_KEY" \
+                                    "$SSH_USER@13.127.50.247" \
+                                    "cd /home/ubuntu/devops-flask-project && \
+                                     docker compose exec -T nginx nginx -T 2>/dev/null |
+                                     grep -q 'proxy_pass http://flask-green:5000;' &&
+                                     echo GREEN ||
+                                     echo BLUE"
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-                    if (ACTIVE_ENV == 'BLUE') {
+                        echo "Currently active environment on EC2: ${ACTIVE_ENV}"
 
-                        echo "Checking GREEN..."
+                        if (ACTIVE_ENV == 'BLUE') {
 
-                        sh '''
-                            docker-compose -p ${COMPOSE_PROJECT} exec -T flask-green \
-                            python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')"
-                        '''
+                            echo "Checking GREEN on EC2..."
 
-                    } else if (ACTIVE_ENV == 'GREEN') {
+                            sh '''
+                                ssh -o StrictHostKeyChecking=no \
+                                    -i "$SSH_KEY" \
+                                    "$SSH_USER@13.127.50.247" \
+                                    "cd /home/ubuntu/devops-flask-project && \
+                                     docker compose exec -T flask-green \
+                                     python -c \\"import urllib.request; urllib.request.urlopen('http://localhost:5000')\\""
+                            '''
 
-                        echo "Checking BLUE..."
+                        } else if (ACTIVE_ENV == 'GREEN') {
 
-                        sh '''
-                            docker-compose -p ${COMPOSE_PROJECT} exec -T flask-blue \
-                            python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')"
-                        '''
+                            echo "Checking BLUE on EC2..."
 
-                    } else {
+                            sh '''
+                                ssh -o StrictHostKeyChecking=no \
+                                    -i "$SSH_KEY" \
+                                    "$SSH_USER@13.127.50.247" \
+                                    "cd /home/ubuntu/devops-flask-project && \
+                                     docker compose exec -T flask-blue \
+                                     python -c \\"import urllib.request; urllib.request.urlopen('http://localhost:5000')\\""
+                            '''
 
-                        error "Invalid active environment: ${ACTIVE_ENV}"
+                        } else {
 
+                            error "Invalid active environment: ${ACTIVE_ENV}"
+
+                        }
                     }
                 }
             }
