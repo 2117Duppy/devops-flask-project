@@ -45,6 +45,25 @@ pipeline {
             }
         }
 
+        stage('Test EC2 Docker Access') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'ec2-deploy-key',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )
+                ]) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no \
+                            -i "$SSH_KEY" \
+                            "$SSH_USER@13.127.50.247" \
+                            "cd /home/ubuntu/devops-flask-project && docker compose ps"
+                    '''
+                }
+            }
+        }
+
         stage('Test AWS Access') {
             steps {
                 withCredentials([
@@ -237,8 +256,6 @@ pipeline {
                 }
             }
         }
-
-
 
         stage('Calculate the version of the build') {
             steps {
