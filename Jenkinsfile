@@ -59,6 +59,7 @@ pipeline {
                             -i "$SSH_KEY" \
                             "$SSH_USER@13.127.50.247" \
                             "cd /home/ubuntu/devops-flask-project && docker compose ps"
+                            "docker compose ps && docker compose config --services"
                     '''
                 }
             }
