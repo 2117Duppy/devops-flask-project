@@ -7,6 +7,18 @@ pipeline {
 
     stages {
 
+        stage('Test EC2 SSH Access') {
+            steps {
+                sshagent(['ec2-deploy-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no \
+                        ubuntu@YOUR_EC2_PUBLIC_IP \
+                        "whoami && hostname"
+                    '''
+                }
+            }
+        }
+
         stage('Test AWS Access') {
             steps {
                 withCredentials([
@@ -199,6 +211,8 @@ pipeline {
                 }
             }
         }
+
+
 
         stage('Calculate the version of the build') {
             steps {
