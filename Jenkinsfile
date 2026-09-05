@@ -26,6 +26,25 @@ pipeline {
             }
         }
 
+        stage('Test EC2 Project Access') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'ec2-deploy-key',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )
+                ]) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no \
+                            -i "$SSH_KEY" \
+                            "$SSH_USER@13.127.50.247" \
+                            "pwd && ls -la"
+                    '''
+                }
+            }
+        }
+
         stage('Test AWS Access') {
             steps {
                 withCredentials([
