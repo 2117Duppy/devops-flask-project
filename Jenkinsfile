@@ -19,7 +19,7 @@ pipeline {
                     sh '''
                         ssh -o StrictHostKeyChecking=no \
                         -i "$SSH_KEY" \
-                        "$SSH_USER@YOUR_EC2_PUBLIC_IP" \
+                        "$SSH_USER@13.127.50.247" \
                         "whoami && hostname"
                     '''
                 }
