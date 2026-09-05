@@ -274,6 +274,11 @@ pipeline {
         stage('Deploy Application') {
             steps {
                 withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'ec2-deploy-key',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    ),
                     string(
                         credentialsId: 'mysql-root-password',
                         variable: 'MYSQL_ROOT_PASSWORD'
@@ -288,57 +293,65 @@ pipeline {
                     )
                 ]) {
                     script {
-                        // Nginx is the source of truth.
-                        // Check which Flask environment is currently receiving traffic.
+
+                // Ask EC2 which Flask environment is currently active.
                         def ACTIVE_ENV = sh(
                             script: '''
-                                set -e
-
-                                ACTIVE=$(docker-compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -T 2>/dev/null |
-                                    grep 'proxy_pass http://flask-' |
-                                    head -n 1)
-
-                                if echo "$ACTIVE" | grep -q "flask-green:5000"; then
-                                    echo "GREEN"
-                                elif echo "$ACTIVE" | grep -q "flask-blue:5000"; then
-                                    echo "BLUE"
-                                else
-                                    echo "ERROR"
-                                    exit 1
-                                fi
+                                ssh -o StrictHostKeyChecking=no \
+                                    -i "$SSH_KEY" \
+                                    "$SSH_USER@13.127.50.247" \
+                                    "cd /home/ubuntu/devops-flask-project && \
+                                     docker compose exec -T nginx nginx -T 2>/dev/null |
+                                     grep 'proxy_pass http://flask-' |
+                                     head -n 1"
                             ''',
                             returnStdout: true
                         ).trim()
 
-                        echo "Currently active environment: ${ACTIVE_ENV}"
+                        if (ACTIVE_ENV.contains("flask-green:5000")) {
+                            ACTIVE_ENV = "GREEN"
+                        } else if (ACTIVE_ENV.contains("flask-blue:5000")) {
+                            ACTIVE_ENV = "BLUE"
+                        } else {
+                            error "Could not determine active environment on EC2"
+                        }
 
-                        // Make sure MySQL and Nginx are running.
-                        // sh '''
-                        //     docker-compose -p ${COMPOSE_PROJECT} up -d --build mysql nginx
-                        // '''
+                        echo "Currently active environment on EC2: ${ACTIVE_ENV}"
 
+                        // Make sure MySQL is running on EC2.
                         sh '''
-                            docker-compose -p ${COMPOSE_PROJECT} up -d mysql
+                            ssh -o StrictHostKeyChecking=no \
+                                -i "$SSH_KEY" \
+                                "$SSH_USER@13.127.50.247" \
+                                "cd /home/ubuntu/devops-flask-project && docker compose up -d mysql"
                         '''
 
                         if (ACTIVE_ENV == 'BLUE') {
 
                             echo "BLUE is currently active."
-                            echo "Deploying GREEN..."
+                            echo "Deploying GREEN on EC2..."
 
                             sh '''
-                                docker-compose -p ${COMPOSE_PROJECT} build flask-green
-                                docker-compose -p ${COMPOSE_PROJECT} up -d flask-green
+                                ssh -o StrictHostKeyChecking=no \
+                                    -i "$SSH_KEY" \
+                                    "$SSH_USER@13.127.50.247" \
+                                    "cd /home/ubuntu/devops-flask-project && \
+                                     docker compose build flask-green && \
+                                     docker compose up -d flask-green"
                             '''
 
                         } else if (ACTIVE_ENV == 'GREEN') {
 
                             echo "GREEN is currently active."
-                            echo "Deploying BLUE..."
+                            echo "Deploying BLUE on EC2..."
 
                             sh '''
-                                docker-compose -p ${COMPOSE_PROJECT} build flask-blue
-                                docker-compose -p ${COMPOSE_PROJECT} up -d flask-blue
+                                ssh -o StrictHostKeyChecking=no \
+                                    -i "$SSH_KEY" \
+                                    "$SSH_USER@13.127.50.247" \
+                                    "cd /home/ubuntu/devops-flask-project && \
+                                     docker compose build flask-blue && \
+                                     docker compose up -d flask-blue"
                             '''
 
                         } else {
