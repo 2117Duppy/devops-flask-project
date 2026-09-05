@@ -9,10 +9,17 @@ pipeline {
 
         stage('Test EC2 SSH Access') {
             steps {
-                sshagent(['ec2-deploy-key']) {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'ec2-deploy-key',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )
+                ]) {
                     sh '''
                         ssh -o StrictHostKeyChecking=no \
-                        ubuntu@YOUR_EC2_PUBLIC_IP \
+                        -i "$SSH_KEY" \
+                        "$SSH_USER@YOUR_EC2_PUBLIC_IP" \
                         "whoami && hostname"
                     '''
                 }
