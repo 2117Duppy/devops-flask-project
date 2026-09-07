@@ -18,7 +18,7 @@ def get_users():
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT name FROM Users")
+    cursor.execute("SELECT id, name FROM Users")
     users = cursor.fetchall()
 
     cursor.close()
@@ -43,6 +43,24 @@ def add_message():
     cursor.execute(
         "INSERT INTO Users (name) VALUES (%s)",
         (message,)
+    )
+
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    return redirect("/")
+
+
+@app.route("/delete/<int:user_id>", methods=["POST"])
+def delete_message(user_id):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "DELETE FROM Users WHERE id = %s",
+        (user_id,)
     )
 
     connection.commit()

@@ -15,7 +15,7 @@ pipeline {
         // 1. TEST EC2 SSH
         // ============================================================
 
-        stage('Test EC2 SSH Access') {
+        stage('Test EC2 SSH Access then list project directory and Docker services') {
             steps {
                 withCredentials([
                     sshUserPrivateKey(
@@ -26,67 +26,22 @@ pipeline {
                 ]) {
                     sh '''
                         ssh -o StrictHostKeyChecking=no \
-                            -i "$SSH_KEY" \
-                            "$SSH_USER@$EC2_HOST" \
-                            "whoami && hostname"
+                        -i "$SSH_KEY" \
+                        "$SSH_USER@$EC2_HOST" \
+                        "whoami && \
+                        hostname && \
+                        cd $EC2_PROJECT && \
+                        pwd && \
+                        ls -la && \
+                        docker compose ps && \
+                        docker compose config --services"
                     '''
                 }
             }
         }
 
-
         // ============================================================
-        // 2. TEST EC2 PROJECT
-        // ============================================================
-
-        stage('Test EC2 Project Access') {
-            steps {
-                withCredentials([
-                    sshUserPrivateKey(
-                        credentialsId: 'ec2-deploy-key',
-                        keyFileVariable: 'SSH_KEY',
-                        usernameVariable: 'SSH_USER'
-                    )
-                ]) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no \
-                            -i "$SSH_KEY" \
-                            "$SSH_USER@$EC2_HOST" \
-                            "cd $EC2_PROJECT && pwd && ls -la"
-                    '''
-                }
-            }
-        }
-
-
-        // ============================================================
-        // 3. TEST EC2 DOCKER
-        // ============================================================
-
-        stage('Test EC2 Docker Access') {
-            steps {
-                withCredentials([
-                    sshUserPrivateKey(
-                        credentialsId: 'ec2-deploy-key',
-                        keyFileVariable: 'SSH_KEY',
-                        usernameVariable: 'SSH_USER'
-                    )
-                ]) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no \
-                            -i "$SSH_KEY" \
-                            "$SSH_USER@$EC2_HOST" \
-                            "cd $EC2_PROJECT && \
-                             docker compose ps && \
-                             docker compose config --services"
-                    '''
-                }
-            }
-        }
-
-
-        // ============================================================
-        // 4. TEST AWS
+        // 2. TEST AWS
         // ============================================================
 
         stage('Test AWS Access') {
@@ -114,7 +69,7 @@ pipeline {
 
 
         // ============================================================
-        // 5. DETECT CURRENT ALB ENVIRONMENT
+        // 3. DETECT CURRENT ALB ENVIRONMENT
         // ============================================================
 
         stage('Detect ALB Active Environment') {
@@ -127,7 +82,6 @@ pipeline {
                     )
                 ]) {
                     script {
-
                         def ACTIVE_TG = sh(
                             script: '''
                                 aws elbv2 describe-listeners \
@@ -165,7 +119,7 @@ pipeline {
 
 
         // ============================================================
-        // 6. SWITCH ALB TRAFFIC
+        // 4. SWITCH ALB TRAFFIC
         // ============================================================
 
         stage('Switch ALB Traffic') {
@@ -305,7 +259,7 @@ pipeline {
 
 
         // ============================================================
-        // 7. CALCULATE BUILD VERSION
+        // 5. CALCULATE BUILD VERSION
         // ============================================================
 
         stage('Calculate the version of the build') {
@@ -326,7 +280,7 @@ pipeline {
 
 
         // ============================================================
-        // 8. DEPLOY APPLICATION TO EC2
+        // 6. DEPLOY APPLICATION TO EC2
         // ============================================================
 
         stage('Deploy Application') {
@@ -351,9 +305,9 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose exec -T nginx nginx -T 2>/dev/null |
-                                     grep 'proxy_pass http://flask-' |
-                                     head -n 1"
+                                    docker compose exec -T nginx nginx -T 2>/dev/null |
+                                    grep 'proxy_pass http://flask-' |
+                                    head -n 1"
                             ''',
                             returnStdout: true
                         ).trim()
@@ -384,7 +338,7 @@ pipeline {
                                 -i "$SSH_KEY" \
                                 "$SSH_USER@$EC2_HOST" \
                                 "cd $EC2_PROJECT && \
-                                 docker compose up -d mysql"
+                                docker compose up -d mysql"
                         '''
 
 
@@ -398,8 +352,8 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose build flask-green && \
-                                     docker compose up -d flask-green"
+                                    docker compose build flask-green && \
+                                    docker compose up -d flask-green"
                             '''
 
 
@@ -413,8 +367,8 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose build flask-blue && \
-                                     docker compose up -d flask-blue"
+                                    docker compose build flask-blue && \
+                                    docker compose up -d flask-blue"
                             '''
 
 
@@ -430,7 +384,7 @@ pipeline {
 
 
         // ============================================================
-        // 9. HEALTH CHECK NEW ENVIRONMENT ON EC2
+        // 7. HEALTH CHECK NEW ENVIRONMENT ON EC2
         // ============================================================
 
         stage('Health Check New Environment') {
@@ -452,10 +406,10 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose exec -T nginx nginx -T 2>/dev/null |
-                                     grep -q 'proxy_pass http://flask-green:5000;' &&
-                                     echo GREEN ||
-                                     echo BLUE"
+                                    docker compose exec -T nginx nginx -T 2>/dev/null |
+                                    grep -q 'proxy_pass http://flask-green:5000;' &&
+                                    echo GREEN ||
+                                    echo BLUE"
                             ''',
                             returnStdout: true
                         ).trim()
@@ -473,8 +427,8 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose exec -T flask-green \
-                                     python -c \\"import urllib.request; urllib.request.urlopen('http://localhost:5000')\\""
+                                    docker compose exec -T flask-green \
+                                    python -c \\"import urllib.request; urllib.request.urlopen('http://localhost:5000')\\""
                             '''
 
 
@@ -487,8 +441,8 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose exec -T flask-blue \
-                                     python -c \\"import urllib.request; urllib.request.urlopen('http://localhost:5000')\\""
+                                    docker compose exec -T flask-blue \
+                                    python -c \\"import urllib.request; urllib.request.urlopen('http://localhost:5000')\\""
                             '''
 
 
@@ -504,7 +458,7 @@ pipeline {
 
 
         // ============================================================
-        // 10. SWITCH NGINX TRAFFIC ON EC2
+        // 8. SWITCH NGINX TRAFFIC ON EC2
         // ============================================================
 
         stage('Switch Traffic and Verify') {
@@ -526,10 +480,10 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose exec -T nginx nginx -T 2>/dev/null |
-                                     grep -q 'proxy_pass http://flask-green:5000;' &&
-                                     echo GREEN ||
-                                     echo BLUE"
+                                    docker compose exec -T nginx nginx -T 2>/dev/null |
+                                    grep -q 'proxy_pass http://flask-green:5000;' &&
+                                    echo GREEN ||
+                                    echo BLUE"
                             ''',
                             returnStdout: true
                         ).trim()
@@ -546,11 +500,11 @@ pipeline {
                                         -i "$SSH_KEY" \
                                         "$SSH_USER@$EC2_HOST" \
                                         "cd $EC2_PROJECT && \
-                                         sed -i 's/flask-blue:5000/flask-green:5000/' nginx/nginx.conf && \
-                                         docker cp nginx/nginx.conf \
-                                         devops-flask-project-nginx-1:/etc/nginx/nginx.conf && \
-                                         docker compose exec -T nginx nginx -t && \
-                                         docker compose exec -T nginx nginx -s reload"
+                                        sed -i 's/flask-blue:5000/flask-green:5000/' nginx/nginx.conf && \
+                                        docker cp nginx/nginx.conf \
+                                        devops-flask-project-nginx-1:/etc/nginx/nginx.conf && \
+                                        docker compose exec -T nginx nginx -t && \
+                                        docker compose exec -T nginx nginx -s reload"
                                 '''
 
 
@@ -561,8 +515,8 @@ pipeline {
                                         -i "$SSH_KEY" \
                                         "$SSH_USER@$EC2_HOST" \
                                         "cd $EC2_PROJECT && \
-                                         docker compose exec -T nginx nginx -T |
-                                         grep 'proxy_pass http://flask-green:5000;'"
+                                        docker compose exec -T nginx nginx -T |
+                                        grep 'proxy_pass http://flask-green:5000;'"
                                 '''
 
 
@@ -575,11 +529,11 @@ pipeline {
                                         -i "$SSH_KEY" \
                                         "$SSH_USER@$EC2_HOST" \
                                         "cd $EC2_PROJECT && \
-                                         sed -i 's/flask-green:5000/flask-blue:5000/' nginx/nginx.conf && \
-                                         docker cp nginx/nginx.conf \
-                                         devops-flask-project-nginx-1:/etc/nginx/nginx.conf && \
-                                         docker compose exec -T nginx nginx -t && \
-                                         docker compose exec -T nginx nginx -s reload"
+                                        sed -i 's/flask-green:5000/flask-blue:5000/' nginx/nginx.conf && \
+                                        docker cp nginx/nginx.conf \
+                                        devops-flask-project-nginx-1:/etc/nginx/nginx.conf && \
+                                        docker compose exec -T nginx nginx -t && \
+                                        docker compose exec -T nginx nginx -s reload"
                                 '''
 
 
@@ -590,8 +544,8 @@ pipeline {
                                         -i "$SSH_KEY" \
                                         "$SSH_USER@$EC2_HOST" \
                                         "cd $EC2_PROJECT && \
-                                         docker compose exec -T nginx nginx -T |
-                                         grep 'proxy_pass http://flask-blue:5000;'"
+                                        docker compose exec -T nginx nginx -T |
+                                        grep 'proxy_pass http://flask-blue:5000;'"
                                 '''
 
 
@@ -617,11 +571,11 @@ pipeline {
                                         -i "$SSH_KEY" \
                                         "$SSH_USER@$EC2_HOST" \
                                         "cd $EC2_PROJECT && \
-                                         sed -i 's/flask-green:5000/flask-blue:5000/' nginx/nginx.conf && \
-                                         docker cp nginx/nginx.conf \
-                                         devops-flask-project-nginx-1:/etc/nginx/nginx.conf && \
-                                         docker compose exec -T nginx nginx -t && \
-                                         docker compose exec -T nginx nginx -s reload"
+                                        sed -i 's/flask-green:5000/flask-blue:5000/' nginx/nginx.conf && \
+                                        docker cp nginx/nginx.conf \
+                                        devops-flask-project-nginx-1:/etc/nginx/nginx.conf && \
+                                        docker compose exec -T nginx nginx -t && \
+                                        docker compose exec -T nginx nginx -s reload"
                                 '''
 
 
@@ -634,11 +588,11 @@ pipeline {
                                         -i "$SSH_KEY" \
                                         "$SSH_USER@$EC2_HOST" \
                                         "cd $EC2_PROJECT && \
-                                         sed -i 's/flask-blue:5000/flask-green:5000/' nginx/nginx.conf && \
-                                         docker cp nginx/nginx.conf \
-                                         devops-flask-project-nginx-1:/etc/nginx/nginx.conf && \
-                                         docker compose exec -T nginx nginx -t && \
-                                         docker compose exec -T nginx nginx -s reload"
+                                        sed -i 's/flask-blue:5000/flask-green:5000/' nginx/nginx.conf && \
+                                        docker cp nginx/nginx.conf \
+                                        devops-flask-project-nginx-1:/etc/nginx/nginx.conf && \
+                                        docker compose exec -T nginx nginx -t && \
+                                        docker compose exec -T nginx nginx -s reload"
                                 '''
                             }
 
@@ -654,7 +608,7 @@ pipeline {
 
 
         // ============================================================
-        // 11. CLEANUP OLD ENVIRONMENT ON EC2
+        // 9. CLEANUP OLD ENVIRONMENT ON EC2
         // ============================================================
 
         stage('Cleanup Old Environment') {
@@ -676,10 +630,10 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose exec -T nginx nginx -T 2>/dev/null |
-                                     grep -q 'proxy_pass http://flask-green:5000;' &&
-                                     echo GREEN ||
-                                     echo BLUE"
+                                    docker compose exec -T nginx nginx -T 2>/dev/null |
+                                    grep -q 'proxy_pass http://flask-green:5000;' &&
+                                    echo GREEN ||
+                                    echo BLUE"
                             ''',
                             returnStdout: true
                         ).trim()
@@ -695,7 +649,7 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose stop flask-blue"
+                                    "docker compose stop flask-blue"
                             '''
 
 
@@ -709,7 +663,7 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                     docker compose stop flask-green"
+                                    "docker compose stop flask-green"
                             '''
 
 
@@ -725,7 +679,7 @@ pipeline {
 
 
         // ============================================================
-        // 12. BUILD ARTIFACT
+        // 10. BUILD ARTIFACT
         // ============================================================
 
         stage('Create Build Artifact') {
@@ -735,8 +689,8 @@ pipeline {
                     writeFile(
                         file: 'build-info.txt',
                         text: """Build Number: ${BUILD_NUMBER}
-Git Commit: ${GIT_COMMIT}
-"""
+                        Git Commit: ${GIT_COMMIT}
+                        """
                     )
                 }
             }
@@ -744,7 +698,7 @@ Git Commit: ${GIT_COMMIT}
 
 
         // ============================================================
-        // 13. ARCHIVE ARTIFACT
+        // 11. ARCHIVE ARTIFACT
         // ============================================================
 
         stage('Archive Artifact') {
@@ -755,7 +709,7 @@ Git Commit: ${GIT_COMMIT}
 
 
         // ============================================================
-        // 14. WAIT FOR SERVICES
+        // 12. WAIT FOR SERVICES
         // ============================================================
 
         stage('Wait for Services') {
@@ -766,7 +720,7 @@ Git Commit: ${GIT_COMMIT}
 
 
         // ============================================================
-        // 15. FINAL HEALTH CHECK
+        // 13. FINAL HEALTH CHECK
         // ============================================================
 
         stage('Final Health Check') {
