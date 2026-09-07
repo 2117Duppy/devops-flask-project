@@ -647,7 +647,7 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                    "docker compose stop flask-blue"
+                                    docker compose stop flask-blue"
                             '''
 
 
@@ -661,7 +661,7 @@ pipeline {
                                     -i "$SSH_KEY" \
                                     "$SSH_USER@$EC2_HOST" \
                                     "cd $EC2_PROJECT && \
-                                    "docker compose stop flask-green"
+                                    docker compose stop flask-green"
                             '''
 
 
