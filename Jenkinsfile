@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         COMPOSE_PROJECT = 'devops-flask-pipeline'
-        EC2_HOST = '13.127.50.247'
+        EC2_HOST = '13.204.77.41'
         EC2_PROJECT = '/home/ubuntu/devops-flask-project'
         AWS_REGION = 'ap-south-1'
         ALB_NAME = 'devops-flask-alb'
@@ -155,8 +155,6 @@ pipeline {
                             """,
                             returnStdout: true
                         ).trim()
-
-
                         def CURRENT_TG = sh(
                             script: """
                                 aws elbv2 describe-listeners \
